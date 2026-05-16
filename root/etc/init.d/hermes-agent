@@ -42,11 +42,11 @@ port_listening() {
 sync_uci_to_yaml() {
 	# Sync UCI config to /root/.hermes/config.yaml
 	local port bind api_endpoint api_key model
-	port=$(uci -q get hermes.main.port || echo "3000")
-	bind=$(uci -q get hermes.main.bind || echo "lan")
-	api_endpoint=$(uci -q get hermes.main.api_endpoint || echo "https://api.boos.lat/v1")
-	api_key=$(uci -q get hermes.main.api_key || echo "")
-	model=$(uci -q get hermes.main.model || echo "opus4.6")
+	port=$(uci -q get hermes_agent.main.port || echo "3000")
+	bind=$(uci -q get hermes_agent.main.bind || echo "lan")
+	api_endpoint=$(uci -q get hermes_agent.main.api_endpoint || echo "https://api.boos.lat/v1")
+	api_key=$(uci -q get hermes_agent.main.api_key || echo "")
+	model=$(uci -q get hermes_agent.main.model || echo "opus4.6")
 
 	# Map UCI bind to listen address
 	local listen_host="127.0.0.1"
@@ -63,11 +63,11 @@ sync_uci_to_yaml() {
 
 	# Generate token if not set
 	local token
-	token=$(uci -q get hermes.main.token || echo "")
+	token=$(uci -q get hermes_agent.main.token || echo "")
 	if [ -z "$token" ]; then
 		token=$(head -c 24 /dev/urandom | hexdump -e '24/1 "%02x"' 2>/dev/null || openssl rand -hex 24 2>/dev/null || echo "hermes_$(date +%s)")
-		uci set hermes.main.token="$token"
-		uci commit hermes 2>/dev/null
+		uci set hermes_agent.main.token="$token"
+		uci commit hermes_agent 2>/dev/null
 	fi
 
 	# Write config.yaml using shell (no Python dependency at this point)
@@ -107,7 +107,7 @@ YAMLEOF
 
 start_service() {
 	local enabled port bind pty_port api_endpoint api_key model
-	config_load hermes
+	config_load hermes_agent
 	config_get enabled main enabled "0"
 	config_get port main port "3000"
 	config_get bind main bind "lan"
@@ -117,7 +117,7 @@ start_service() {
 	config_get model main model "opus4.6"
 
 	[ "$enabled" = "1" ] || {
-		echo "hermes is disabled. Set enabled to 1 in /etc/config/hermes"
+		echo "hermes-agent is disabled. Set enabled to 1 in /etc/config/hermes_agent"
 		return 0
 	}
 
@@ -177,16 +177,16 @@ start_service() {
 	procd_set_param respawn 3600 10 5
 	procd_set_param stdout 1
 	procd_set_param stderr 1
-	procd_set_param pidfile /var/run/hermes.pid
+	procd_set_param pidfile /var/run/hermes-agent.pid
 	procd_close_instance
 
 	# Start Web PTY config terminal (auxiliary service)
 	local pty_token
-	pty_token=$(uci -q get hermes.main.pty_token || echo "")
+	pty_token=$(uci -q get hermes_agent.main.pty_token || echo "")
 	if [ -z "$pty_token" ]; then
 		pty_token=$(head -c 16 /dev/urandom | hexdump -e '16/1 "%02x"' 2>/dev/null || openssl rand -hex 16 2>/dev/null || echo "pty_$(date +%s)")
-		uci set hermes.main.pty_token="$pty_token"
-		uci commit hermes 2>/dev/null
+		uci set hermes_agent.main.pty_token="$pty_token"
+		uci commit hermes_agent 2>/dev/null
 	fi
 
 	procd_open_instance "pty"
@@ -201,7 +201,7 @@ start_service() {
 	procd_set_param respawn 3600 5 5
 	procd_set_param stdout 1
 	procd_set_param stderr 1
-	procd_set_param pidfile /var/run/hermes-pty.pid
+	procd_set_param pidfile /var/run/hermes-agent-pty.pid
 	procd_close_instance
 }
 
@@ -264,7 +264,7 @@ _port_free() {
 
 stop_service() {
 	local port
-	port=$(uci -q get hermes.main.port || echo "3000")
+	port=$(uci -q get hermes_agent.main.port || echo "3000")
 
 	for pid in $(pgrep -f "hermes.*gateway" 2>/dev/null) \
 	           $(pgrep -f "hermes.*gateway.*run" 2>/dev/null); do
@@ -281,7 +281,7 @@ stop_service() {
 }
 
 service_triggers() {
-	procd_add_reload_trigger "hermes"
+	procd_add_reload_trigger "hermes_agent"
 }
 
 reload_service() {
@@ -297,9 +297,9 @@ setup() {
 
 restart_gateway() {
 	local port gw_pid
-	port=$(uci -q get hermes.main.port || echo "3000")
-	gw_pid=$(ubus call service list '{"name":"hermes"}' 2>/dev/null | \
-		jsonfilter -e '$.hermes.instances.gateway.pid' 2>/dev/null) || true
+	port=$(uci -q get hermes_agent.main.port || echo "3000")
+	gw_pid=$(ubus call service list '{"name":"hermes-agent"}' 2>/dev/null | \
+		jsonfilter -e '$.hermes-agent.instances.gateway.pid' 2>/dev/null) || true
 
 	[ -n "$gw_pid" ] && kill -0 "$gw_pid" 2>/dev/null && kill "$gw_pid" 2>/dev/null
 	for pid in $(pgrep -f "hermes.*gateway" 2>/dev/null); do
@@ -312,13 +312,13 @@ restart_gateway() {
 	done
 	_port_free "$port" || _kill_port_proc "$port"
 
-	[ -z "$gw_pid" ] && /etc/init.d/hermes start >/dev/null 2>&1
+	[ -z "$gw_pid" ] && /etc/init.d/hermes-agent start >/dev/null 2>&1
 }
 
 status_service() {
 	local port pty_port
-	port=$(uci -q get hermes.main.port || echo "3000")
-	pty_port=$(uci -q get hermes.main.pty_port || echo "3001")
+	port=$(uci -q get hermes_agent.main.port || echo "3000")
+	pty_port=$(uci -q get hermes_agent.main.pty_port || echo "3001")
 
 	echo "=== Hermes Agent Service Status ==="
 

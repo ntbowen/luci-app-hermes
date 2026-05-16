@@ -17,7 +17,7 @@ LUCI_MINIFY_JS:=0
 include $(TOPDIR)/feeds/luci/luci.mk
 
 define Package/luci-app-hermes-agent/conffiles
-/etc/config/hermes
+/etc/config/hermes_agent
 endef
 
 define Package/luci-app-hermes-agent/postinst
