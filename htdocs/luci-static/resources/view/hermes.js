@@ -9,8 +9,8 @@
 var HELPER = '/usr/share/hermes/luci-helper';
 
 function callHelper(args) {
-	return L.resolveDefault(fs.exec_direct(HELPER, args), '').then(function(res) {
-		try { return JSON.parse(String(res).trim()); }
+	return L.resolveDefault(fs.exec(HELPER, args), null).then(function(res) {
+		try { return JSON.parse(String((res && res.stdout) || '').trim()); }
 		catch(e) { return {}; }
 	});
 }

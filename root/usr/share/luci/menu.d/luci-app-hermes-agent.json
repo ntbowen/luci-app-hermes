@@ -7,7 +7,7 @@
 			"path": "hermes"
 		},
 		"depends": {
-			"acl": ["luci-app-hermes"],
+			"acl": ["luci-app-hermes-agent"],
 			"uci": { "hermes": true }
 		}
 	}

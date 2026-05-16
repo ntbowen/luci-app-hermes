@@ -2,14 +2,19 @@
 # luci-app-hermes — First-boot setup (uci-defaults)
 # This runs once after package installation
 
-# Set default values if not already set
-uci -q set hermes.main.enabled='0' 2>/dev/null
-uci -q set hermes.main.port='3000' 2>/dev/null
-uci -q set hermes.main.bind='lan' 2>/dev/null
-uci -q set hermes.main.api_endpoint='https://api.boos.lat/v1' 2>/dev/null
-uci -q set hermes.main.api_key='' 2>/dev/null
-uci -q set hermes.main.model='opus4.6' 2>/dev/null
-uci -q set hermes.main.pty_port='3001' 2>/dev/null
+# Ensure config section exists
+uci -q get hermes.main >/dev/null 2>&1 || {
+	uci -q batch << EOF
+set hermes.main=hermes
+set hermes.main.enabled=0
+set hermes.main.port=3000
+set hermes.main.bind=lan
+set hermes.main.api_endpoint=https://api.boos.lat/v1
+set hermes.main.api_key=
+set hermes.main.model=opus4.6
+set hermes.main.pty_port=3001
+EOF
+}
 
 # Generate auth token if not set
 token=$(uci -q get hermes.main.token || echo "")
